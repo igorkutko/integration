@@ -1,0 +1,108 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<odoo>
+
+    <record id="integration_task_report_paperformat" model="report.paperformat">
+        <field name="name">Doctor report (A4)</field>
+        <field name="default" eval="True"/>
+        <field name="format">A4</field>
+        <field name="orientation">Portrait</field>
+        <field name="page_height">0</field>
+        <field name="page_width">0</field>
+        <field name="margin_top">5</field>
+        <field name="margin_bottom">5</field>
+        <field name="margin_left">5</field>
+        <field name="margin_right">5</field>
+        <field name="header_line" eval="False"/>
+        <field name="header_spacing">0</field>
+        <field name="dpi">0</field>
+    </record>
+
+    <record id="integration_task_report_report" model="ir.actions.report">
+        <field name="name">Task report</field>
+        <field name="model">project.task</field>
+        <field name="report_type">qweb-html</field>
+        <field name="report_name">jira.integration_task_report_template</field>
+        <field name="report_file">jira.integration_task_report_template</field>
+        <field name="print_report_name">('Task report - %s' % (object.name))</field>
+        <field name="binding_model_id" ref="model_project_task"/>
+        <field name="binding_type">report</field>
+        <field name="paperformat_id" ref="jira.integration_task_report_paperformat"/>
+    </record>
+
+    <record id="integration_task_report_view_pivot" model="ir.ui.view">
+        <field name="name">Task report view pivot</field>
+        <field name="model">integration.task_report</field>
+        <field name="arch" type="xml">
+            <pivot display_quantity="1" sample="1">
+                <field name="user_id" type="row"/>
+                <field name="task_id" type="row"/>
+                <field name="timesheet_date" interval="day" type="col"/>
+                <field name="worked_hours" type="measure"/>
+            </pivot>
+        </field>
+    </record>
+
+    <record id="integration_task_report_view_graph" model="ir.ui.view">
+        <field name="name">Task report view graph</field>
+        <field name="model">integration.task_report</field>
+        <field name="arch" type="xml">
+            <graph>
+                <field name="user_id"/>
+                <field name="task_id"/>
+                <field name="worked_hours" type="measure"/>
+            </graph>
+        </field>
+    </record>
+
+    <record id="integration_task_report_view_search" model="ir.ui.view">
+        <field name="name">Task report view search</field>
+        <field name="model">integration.task_report</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="external_task_key"/>
+                <field name="project_id"/>
+                <field name="task_id"/>
+                <field name="user_id"/>
+                <field name="kanban_state"/>
+                <separator/>
+                <filter name="filter_timesheet_date" string="Date" date="timesheet_date"/>
+                <filter
+                        name="previous_month"
+                        string="Previous month"
+                        default_period="last_month"
+                        />
+                <filter
+                        name="current_month"
+                        string="Current month"
+                        date="timesheet_date"
+                        default_period="this_month"
+                        />
+                <group>
+                    <filter name="groupby_project" string="Project" context="{'group_by': 'project_id'}"/>
+                    <filter name="groupby_task" string="Task" context="{'group_by': 'task_id'}"/>
+                    <filter name="groupby_user" string="User" context="{'group_by': 'user_id'}"/>
+                    <filter name="groupby_status" string="Status" context="{'group_by': 'kanban_state'}"/>
+                    <filter name="groupby_date" string="Date" context="{'group_by': 'timesheet_date'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <record id="integration_task_report_action" model="ir.actions.act_window">
+        <field name="name">Task report (timesheet)</field>
+        <field name="res_model">integration.task_report</field>
+        <field name="view_mode">pivot,graph</field>
+        <field name="search_view_id" ref="jira.integration_task_report_view_search"/>
+        <field name="context">{'search_default_current_month': 1}</field>
+    </record>
+
+    <menuitem
+            id="integration_task_report_menu"
+            name="Task report"
+            parent="integration_menu_report"
+            action="jira.integration_task_report_action"
+            sequence="20"
+    />
+
+</odoo>
