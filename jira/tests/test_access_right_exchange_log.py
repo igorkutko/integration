@@ -23,25 +23,27 @@ class TestAccessRightExchangeLog(TransactionCase):
         })
 
     def create_service(self, user, **values):
-        return self.env['integration.external_service'].with_user(user).create({
+        external_service_manager = self.env['integration.external_service']
+        return external_service_manager.with_user(user).create({
             'name': 'test_service',
             **values
         })
 
     def create_exchange_log(self, user, **values):
         one_hour = timedelta(hours=1)
-        return self.env['integration.exchange_log'].with_user(user).create({
+        exchange_log_manager = self.env['integration.exchange_log']
+        return exchange_log_manager.with_user(user).create({
             'name': 'test_exchange_log',
             'start_date': datetime.now(),
             'finish_date': datetime.now() + one_hour,
             **values
-
         })
 
     def test_check_access_user(self):
         test_system1 = self.create_system(self.test_admin)
-        test_service1 = self.create_service(self.test_admin,
-                                            system_id=test_system1)
+        test_service1 = self.create_service(
+            self.test_admin,
+            system_id=test_system1.id)
         one_hour = timedelta(hours=1)
         one_day = timedelta(days=1)
 
@@ -64,14 +66,19 @@ class TestAccessRightExchangeLog(TransactionCase):
         )
 
         exchange_log_manager = self.env['integration.exchange_log']
-        exchange_log_ids = exchange_log_manager.with_user(self.test_user).browse()
+        domain_today = [('id', '=', test_exchange_log_now.id)]
+        domain_not_today = [('id', '=', test_exchange_log_old.id)]
+        today_count = exchange_log_manager.with_user(
+            self.test_user).search_count(domain_today)
+        not_today_count = exchange_log_manager.with_user(
+            self.test_user).search_count(domain_not_today)
 
-        self.assertInNot(
-            member=test_exchange_log_old.id,
-            container=exchange_log_ids,
+        self.assertEqual(
+            first=not_today_count,
+            second=0,
             msg='User should not have access to the old logs')
 
-        self.assertIn(
-            member=test_exchange_log_now.id,
-            container=exchange_log_ids,
+        self.assertGreater(
+            a=today_count,
+            b=0,
             msg='User must have access to logs of today')

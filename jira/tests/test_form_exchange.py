@@ -16,21 +16,24 @@ class TestFormExchange(TransactionCase):
         default_worklog_service = self.env.ref(
             'jira.integration_external_service_worklog')
 
-        project_key = "TEST";
+        project_key = "TEST"
 
         exchange_form = Form(self.env['integration.exchange'])
         exchange_form.project_key = project_key
         test_exchange1 = exchange_form.save()
+        msg_pfx = f"Exchange service {test_exchange1.service_id.name}"
+        msg_sfx = f"is not equal default value {default_service.name}"
         self.assertEqual(
-            test_exchange1.service_id,
+            test_exchange1.service_id.id,
             default_service.id,
-            msg=f"""Exchange service {test_exchange1.service_id.name} 
-                is not equal default value {default_service.name}""")
+            msg=f"{msg_pfx} {msg_sfx}")
+        test_worklog_service_name = test_exchange1.worklog_service_id.name
+        msg_pfx = f"Exchange worklog service {test_worklog_service_name}"
+        msg_sfx = f"is not equal default value {default_worklog_service.name}"
         self.assertEqual(
-            test_exchange1.worklog_service_id,
+            test_exchange1.worklog_service_id.id,
             default_worklog_service.id,
-            msg=f"""Exchange worklog service {test_exchange1.worklog_service_id.name}
-                is not equal default value {default_worklog_service.name}""")
+            msg=f"{msg_pfx} {msg_sfx}")
         self.assertEqual(
             test_exchange1.project_key,
             project_key,
