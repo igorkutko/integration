@@ -48,7 +48,7 @@ class TaskReport(models.Model):
                 CASE
                     WHEN task.planned_hours ISNULL
                         THEN 0
-                    ELSE task.planned_hours 
+                    ELSE task.planned_hours
                 END AS planned_hours,
                 timesheet.employee_id AS employee_id,
                 timesheet.user_id AS user_id,

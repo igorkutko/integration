@@ -34,7 +34,6 @@ Integration: Jira
         'wizard/exchange_views.xml',
         'report/planned_workload_report_templates.xml',
         'report/planned_workload_report_views.xml',
-        'report/task_report_templates.xml',
         'report/task_report_views.xml',
     ],
 

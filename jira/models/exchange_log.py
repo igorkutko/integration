@@ -32,7 +32,8 @@ class ExchangeLog(models.Model):
     @api.depends('start_date', 'finish_date')
     def _compute_execution_time(self):
         for obj in self:
-            obj.execution_time = (obj.finish_date - obj.start_date).total_seconds()
+            execution_timedelta = obj.finish_date - obj.start_date
+            obj.execution_time = execution_timedelta.total_seconds()
 
     @api.depends('start_date')
     def _compute_day_delta(self):

@@ -144,14 +144,14 @@ class Exchange(models.TransientModel):
                     response.content).replace(b"\n", b"")
 
         except Exception as e:
-            _logger.warning("Can’t load the image from URL %s" % url)
+            _logger.warning(f"Can’t load the image from URL {url}")
             logging.exception(e)
         return image_data
 
     @api.model
     def get_user(self, name, email, avatar):
         user_manager = self.env['res.users']
-        if not(name and email):
+        if not (name and email):
             return user_manager
         domain = [('email', '=', email)]
         user_vals = {
@@ -265,29 +265,16 @@ class Exchange(models.TransientModel):
         return result
 
     def get_request_parameters(self, ext_service, issue_id=0):
-        params_dict = dict()
-        inline_params_dict = dict()
-
         method_name = ext_service.method_name
         inline_params = re.findall(r'{(.+?)}', method_name)
 
-        domain = [('service_id', '=', ext_service.id)]
-        parameter_manager = self.env['integration.external_service_parameter']
-        parameter_recordset = parameter_manager.search(domain)
-        for parameter in parameter_recordset:
-            param_value = self.get_parameter_value(
-                parameter.name, parameter.value, issue_id)
-            if inline_params and parameter.name in inline_params:
-                inline_params_dict[parameter.name] = param_value
-            else:
-                params_dict[parameter.name] = param_value
+        params_dict, inline_params_dict = self.get_service_parameters(
+            ext_service, issue_id, inline_params)
 
-        if inline_params:
-            for inline_param_name in inline_params:
-                inline_param_value = inline_params_dict.get(
-                    inline_param_name, '')
-                method_name = method_name.replace(
-                    '{' + inline_param_name + '}', inline_param_value)
+        for inline_param_name in inline_params:
+            method_name = method_name.replace(
+                '{' + inline_param_name + '}',
+                inline_params_dict.get(inline_param_name, ''))
 
         if self.service_id.http_method == 'GET':
             params = ''
@@ -298,7 +285,24 @@ class Exchange(models.TransientModel):
             params = json.dumps(params_dict)
         return method_name, params
 
-    def get_parameter_value(self, parameter_name, parameter_value=None, issue_id=0):
+    def get_service_parameters(self, ext_service, issue_id, inline_params):
+        params_dict = dict()
+        inline_params_dict = dict()
+
+        parameter_manager = self.env['integration.external_service_parameter']
+        domain = [('service_id', '=', ext_service.id)]
+        parameter_recordset = parameter_manager.search(domain)
+        for parameter in parameter_recordset:
+            param_value = self.get_parameter_value(
+                parameter.name, parameter.value, issue_id)
+            if inline_params and parameter.name in inline_params:
+                inline_params_dict[parameter.name] = param_value
+            else:
+                params_dict[parameter.name] = param_value
+        return params_dict, inline_params_dict
+
+    def get_parameter_value(
+            self, parameter_name, parameter_value=None, issue_id=0):
         parameter_value = parameter_value or ''
         date_fmt = '%Y/%m/%d %H:%M'
         if parameter_name == 'updated1':
@@ -334,7 +338,6 @@ class Exchange(models.TransientModel):
     @api.model
     def execute_request(self, ext_request):
         # source data for request
-        ext_system = ext_request.system_id
         ext_service = ext_request.service_id
         params = ext_request.parameters
 
@@ -385,6 +388,23 @@ class Exchange(models.TransientModel):
 
         ext_request.write(vals)
 
+        self.create_exchange_log(
+            ext_request,
+            url=url,
+            start_date=start_date,
+            finish_date=finish_date
+            )
+
+        return True
+
+    def create_exchange_log(self, ext_request, **kwargs):
+        ext_system = ext_request.system_id
+        ext_service = ext_request.service_id
+
+        url = kwargs.get('url', '')
+        start_date = kwargs.get('start_date')
+        finish_date = kwargs.get('finish_date')
+
         exchange_log_manager = self.env['integration.exchange_log']
         log_vals = {
             'name': f'ex_id: {self["id"]}, service: {ext_service.name}',
@@ -401,8 +421,6 @@ class Exchange(models.TransientModel):
             'finish_date': finish_date,
         }
         exchange_log_manager.create(log_vals)
-
-        return True
 
     @api.model
     def get_url(self, ext_request, method_name=''):
@@ -502,7 +520,7 @@ class Exchange(models.TransientModel):
         jira_issue_manager = self.env['integration.jira_issue']
 
         for issue in issues:
-            issue_values = self.get_issue_values(issue, browse_link_prefix)
+            issue_values = self.get_issue_values(issue)  # , browse_link_prefix
             if not issue_values:
                 continue
             issue_id = issue.get('id')
@@ -517,7 +535,6 @@ class Exchange(models.TransientModel):
             issue_values["comment_total"] = 0
             if issue_comment:
                 issue_values["comment_total"] = issue_comment.get("total", 0)
-
             try:
                 read_result["jira_issue_record"] = jira_issue_manager.create(
                     issue_values)
@@ -532,7 +549,7 @@ class Exchange(models.TransientModel):
 
         return read_result
 
-    def get_issue_values(self, issue, browse_link_prefix):
+    def get_issue_values(self, issue):  # , browse_link_prefix
         issue_values = dict()
         issue_fields = issue.get('fields')
         if not issue_fields:
@@ -540,7 +557,7 @@ class Exchange(models.TransientModel):
         issue_values["exchange_id"] = self['id']
         issue_values["issue_key"] = issue["key"]
         issue_values["issue_id"] = issue["id"]
-        issue_values["self"] = issue["self"]
+        # issue_values["self"] = issue["self"]
         issue_values["summary"] = issue_fields["summary"]
         issue_values["description"] = issue_fields["description"]
 
@@ -552,7 +569,7 @@ class Exchange(models.TransientModel):
             issue_values["resolution_date"] = self.get_date_iso(
                 issue_fields["resolutiondate"])
 
-        issue_values["browse_link"] = f'{browse_link_prefix}{issue["key"]}'
+        # issue_values["browse_link"] = f'{browse_link_prefix}{issue["key"]}'
         if issue_fields.get("status"):
             issue_values["status_name"] = issue_fields["status"]["name"]
         if issue_fields.get("issuetype"):
@@ -590,17 +607,17 @@ class Exchange(models.TransientModel):
             project = issue_fields["project"]
             issue_values["project_key"] = project.get("key")
             issue_values["project_name"] = project.get("name")
-        if issue_fields.get("parent"):
-            parent = issue_fields["parent"]
-            issue_values["parent_id"] = parent.get("id")
-            issue_values["parent_key"] = parent.get("key")
+        # if issue_fields.get("parent"):
+        #     parent = issue_fields["parent"]
+        #     issue_values["parent_id"] = parent.get("id")
+        #     issue_values["parent_key"] = parent.get("key")
         if issue_fields.get("priority"):
             priority = issue_fields["priority"]
             issue_values["priority"] = priority.get("name")
-        if issue_fields.get("customfield_10101"):
-            issue_values["epic_key"] = issue_fields["customfield_10101"]
-        if issue_fields.get("customfield_10103"):
-            issue_values["epic_name"] = issue_fields["customfield_10103"]
+        # if issue_fields.get("customfield_10101"):
+        #     issue_values["epic_key"] = issue_fields["customfield_10101"]
+        # if issue_fields.get("customfield_10103"):
+        #     issue_values["epic_name"] = issue_fields["customfield_10103"]
 
         return issue_values
 
@@ -744,7 +761,6 @@ class Exchange(models.TransientModel):
 
     def find_tasks(self):
         task_manager = self.env['project.task']
-        
         domain = [('exchange_id', '=', self['id'])]
         jira_issue_manager = self.env['integration.jira_issue']
         jira_issue_recordset = jira_issue_manager.search(domain)
@@ -788,7 +804,9 @@ class Exchange(models.TransientModel):
             'user_id': user.id if user else 0,
             'external_project_key': jira_issue.project_key,
         }
-        project_domain = [('external_project_key', '=', jira_issue.project_key)]
+        project_domain = [
+            ('external_project_key', '=', jira_issue.project_key)
+        ]
         project_recordset = project_manager.search(project_domain)
         if project_recordset:
             project = project_recordset[0]
@@ -828,20 +846,19 @@ class Exchange(models.TransientModel):
             'external_task_key': jira_issue.issue_key,
             'user_ids': user_ids,
         }
-        task_domain = [('external_task_key', '=', jira_issue.issue_key)]
-        task_recordset = task_manager.search(task_domain)
+        domain = [('external_task_key', '=', jira_issue.issue_key)]
+        task_recordset = task_manager.search(domain)
         if task_recordset:
             task = task_recordset[0]
             task.write(task_vals)
         else:
             task = task_manager.create(task_vals)
 
-        worklog_domain = [
+        domain = [
             ('exchange_id', '=', self['id']),
             ('issue_id', '=', jira_issue.issue_id)
         ]
-        jira_worklog_recordset = jira_worklog_manager.search(
-            worklog_domain)
+        jira_worklog_recordset = jira_worklog_manager.search(domain)
         for jira_worklog in jira_worklog_recordset:
             self.create_update_timesheet(task, jira_worklog)
         return task

@@ -10,4 +10,5 @@ class ProjectTask(models.Model):
     @api.depends('user_ids')
     def _compute_assignee_list(self):
         for obj in self:
-            obj.assignee_list = ', '.join(sorted(list((user.name for user in obj.user_ids))))
+            obj.assignee_list = ', '.join(
+                sorted(list((user.name for user in obj.user_ids))))
