@@ -10,6 +10,7 @@
 
     <record id="integration_group_administrator" model="res.groups">
         <field name="name">Integration / Administrator</field>
+        <field name="implied_ids" eval="[(4, ref('jira.integration_group_user'))]"/>
         <field name="category_id" ref="base.module_category_services"/>
         <field name="users" eval="[(4,ref('base.user_admin'))]"/>
         <field name="comment">Administrator: full access</field>
